@@ -62,17 +62,19 @@ def test_matching_geometries_intersection_case_sensitive(simple_rc_section):
     section = simple_rc_section
 
     # Case sensitive: "con*" matches "concrete" but "CON*" does not
-    surfaces, points = s_res._matching_geometries(section, name='con*')
+    surfaces, points = s_res._matching_geometries(
+        section.geometry, name='con*'
+    )
     assert len(surfaces) == 1
     assert surfaces[0].name == 'concrete'
     assert len(points) == 0
 
-    surfaces, _ = s_res._matching_geometries(section, name='CON*')
+    surfaces, _ = s_res._matching_geometries(section.geometry, name='CON*')
     assert len(surfaces) == 0
 
     # Case insensitive: "CON*" matches "concrete"
     surfaces, _ = s_res._matching_geometries(
-        section, name='CON*', case_sensitive=False
+        section.geometry, name='CON*', case_sensitive=False
     )
     assert len(surfaces) == 1
     assert surfaces[0].name == 'concrete'
@@ -266,7 +268,7 @@ def test_moment_curvature_result_point(simple_rc_section):
     stress = res.get_point_stress(y=y1, z=z1, group_label='bottom')
     assert isinstance(stress, np.ndarray)
 
-    assert len(stress) == len(res.eps_axial)
+    assert len(stress) == len(res.eps_a)
 
     # Check that at the end the stress on the bar is the yield strength of
     # reinforcement.
@@ -283,7 +285,7 @@ def test_moment_curvature_result_point(simple_rc_section):
     stress = res.get_point_stress(y=y2, z=z2, group_label='top')
     assert isinstance(stress, np.ndarray)
 
-    assert len(stress) == len(res.eps_axial)
+    assert len(stress) == len(res.eps_a)
 
 
 def test_moment_curvature_result(simple_rc_section):
@@ -291,8 +293,6 @@ def test_moment_curvature_result(simple_rc_section):
     section = simple_rc_section
 
     res = section.section_calculator.calculate_moment_curvature()
-
-    res.create_detailed_result()
 
     stresses_bottom = res.get_point_stress(
         y=-160.0, z=-160.0, group_label='bottom'
@@ -325,8 +325,6 @@ def test_bending_strength_result(simple_rc_section):
     section = simple_rc_section
 
     res = section.section_calculator.calculate_bending_strength()
-
-    res.create_detailed_result()
 
     stress_bottom = res.get_point_stress(
         y=-160.0, z=-160.0, group_label='bottom'
@@ -376,6 +374,9 @@ def test_calc_strain_profile_results(
     assert np.allclose(
         strain_res.residual, f_ext - f_int, rtol=1e-7, atol=1e-7
     )
+    assert math.isclose(
+        strain_res.residual_norm, np.linalg.norm(f_ext - f_int), abs_tol=1e-7
+    )
 
     # Check the the correct data are stored from convergence
     assert math.isclose(strain_res.tolerance, tol)
@@ -402,9 +403,6 @@ def test_calc_strain_profile_results(
     strain_bottom = strain_res.get_point_strain(
         y=-160.0, z=-160.0, group_label='bottom'
     )
-
-    # Get detailed result
-    strain_res.create_detailed_result()
 
     assert np.isclose(
         stress_bottom, strain_res.detailed_result.point_data['stress'][0]

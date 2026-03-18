@@ -10,10 +10,11 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from shapely import Point
 
+from ..geometry import CompoundGeometry
 from .base import Geometry, Section
 
 
-@dataclass
+@dataclass(slots=True)
 class SectionProperties:
     """Simple dataclass for storing section properties."""
 
@@ -145,8 +146,10 @@ class SectionProperties:
         if not isinstance(other, self.__class__):
             return NotImplemented
 
-        a = np.array(list(vars(self).values()))
-        b = np.array(list(vars(other).values()))
+        field_names = [f.name for f in fields(self)]
+        a = np.array([getattr(self, name) for name in field_names])
+        b = np.array([getattr(other, name) for name in field_names])
+
         return np.allclose(a, b, rtol=rtol, atol=atol)
 
 
@@ -156,16 +159,16 @@ class SectionProperties:
 
 
 def _matching_geometries(
-    section: Section,
+    geometry: CompoundGeometry,
     name: t.Optional[str] = None,
     group_label: t.Optional[str] = None,
     case_sensitive: bool = True,
 ):
     """Return (surfaces, points) that match name/group filters."""
-    geometries_name = section.geometry.name_filter(
+    geometries_name = geometry.name_filter(
         name, return_mode='split', case_sensitive=case_sensitive
     )
-    geometries_group = section.geometry.group_filter(
+    geometries_group = geometry.group_filter(
         group_label, return_mode='split', case_sensitive=case_sensitive
     )
 
@@ -227,7 +230,7 @@ def _get_point_response(
         return None
 
     surfaces, points = _matching_geometries(
-        section, name, group_label, case_sensitive
+        section.geometry, name, group_label, case_sensitive
     )
 
     if all_results:
@@ -269,7 +272,7 @@ def _get_point_response(
     return None
 
 
-@dataclass
+@dataclass(slots=True)
 class MomentCurvatureResults:
     """Class for storing moment curvature results.
 
@@ -280,21 +283,21 @@ class MomentCurvatureResults:
     n: float = 0  # axial load - mantained constant during analysis
     chi_y: ArrayLike = None  # the curvatures
     chi_z: ArrayLike = None  # the curvatures
-    eps_axial: ArrayLike = 0  # the axial strain (at section 0,0)
+    eps_a: ArrayLike = None  # the axial strain (at section 0,0)
     m_y: ArrayLike = None  # the moment
     m_z: ArrayLike = None  # the moment
 
-    section: Section = None
+    section: t.Optional[Section] = None
 
-    detailed_result: SectionDetailedResultState = None
+    _detailed_result: SectionDetailedResultState = None
     seed: int = None
     current_step: int = None
     num_points: int = None
 
     def _create_detailed_result(self):
-        self.detailed_result = SectionDetailedResultState(
+        self._detailed_result = SectionDetailedResultState(
             section=self.section,
-            eps_a=self.eps_axial[self.current_step],
+            eps_a=self.eps_a[self.current_step],
             chi_y=self.chi_y[self.current_step],
             chi_z=self.chi_z[self.current_step],
             n=self.n,
@@ -304,12 +307,23 @@ class MomentCurvatureResults:
             seed=self.seed,
         )
 
+    @property
+    def detailed_result(self) -> SectionDetailedResultState:
+        """Returns the detailed result."""
+        if self._detailed_result is None:
+            self.create_detailed_result()
+        return self._detailed_result
+
     def create_detailed_result(self, num_points=1000):
         """Create the detailed result object.
 
         Arguments:
             num_points (int): Number of random points to sample for each
                 surface geometry (default = 1000).
+
+        Notes:
+            It is called with default values when first accessing the property
+                `detailed_result`.
         """
         if self.seed is None:
             self.seed = np.random.randint(1, 100, 1)[0].item()
@@ -320,17 +334,13 @@ class MomentCurvatureResults:
 
     def next_step(self):
         """Advance to the next step in the detailed result."""
-        if self.detailed_result is None:
-            return
-        if self.current_step < len(self.m_y) - 1:
+        if self._detailed_result and self.current_step < len(self.m_y) - 1:
             self.current_step += 1
             self._create_detailed_result()
 
     def previous_step(self):
         """Go back to the previous step in the detailed result."""
-        if self.detailed_result is None:
-            return
-        if self.current_step > 0:
+        if self._detailed_result and self.current_step > 0:
             self.current_step -= 1
             self._create_detailed_result()
 
@@ -340,9 +350,7 @@ class MomentCurvatureResults:
         Arguments:
             step (int): the step to set for the datailed_result object.
         """
-        if self.detailed_result is None:
-            return
-        if 0 <= step < len(self.m_y):
+        if self._detailed_result and 0 <= step < len(self.m_y):
             self.current_step = step
             self._create_detailed_result()
 
@@ -376,7 +384,7 @@ class MomentCurvatureResults:
         """
         return _get_point_response(
             section=self.section,
-            eps_a=np.asarray(self.eps_axial),
+            eps_a=np.asarray(self.eps_a),
             chi_y=np.asarray(self.chi_y),
             chi_z=np.asarray(self.chi_z),
             y=y,
@@ -419,7 +427,7 @@ class MomentCurvatureResults:
         """
         return _get_point_response(
             section=self.section,
-            eps_a=np.asarray(self.eps_axial),
+            eps_a=np.asarray(self.eps_a),
             chi_y=np.asarray(self.chi_y),
             chi_z=np.asarray(self.chi_z),
             y=y,
@@ -682,7 +690,7 @@ class SectionDetailedResultState:
         return self._point_data
 
 
-@dataclass
+@dataclass(slots=True)
 class UltimateBendingMomentResults:
     """Class for storing the ultimate bending moment computation for a given
     inclination of n.a. and axial load.
@@ -696,9 +704,9 @@ class UltimateBendingMomentResults:
     chi_z: float = 0  # the curvature corresponding to the ultimate moment
     eps_a: float = 0  # the axial strain at 0,0 corresponding to Mult
 
-    section = None
+    section: t.Optional[Section] = None
 
-    detailed_result: SectionDetailedResultState = None
+    _detailed_result: SectionDetailedResultState = None
 
     def create_detailed_result(self, num_points=1000):
         """Create the detailed result object.
@@ -706,8 +714,12 @@ class UltimateBendingMomentResults:
         Arguments:
             num_points (int): Number of random points to sample for each
                 surface geometry (default = 1000).
+
+        Notes:
+            It is called with default values when first accessing the property
+                `detailed_result`.
         """
-        self.detailed_result = SectionDetailedResultState(
+        self._detailed_result = SectionDetailedResultState(
             section=self.section,
             eps_a=self.eps_a,
             chi_y=self.chi_y,
@@ -717,6 +729,13 @@ class UltimateBendingMomentResults:
             m_z=self.m_z,
             num_points=num_points,
         )
+
+    @property
+    def detailed_result(self) -> SectionDetailedResultState:
+        """Returns the detailed result."""
+        if self._detailed_result is None:
+            self.create_detailed_result()
+        return self._detailed_result
 
     def get_point_strain(
         self,
@@ -836,9 +855,9 @@ class StrainProfileResult:
     strain_history: list[NDArray[np.float64]] = field(default_factory=list)
 
     # For context store the section
-    section: t.Any = None  # Note for future: if I want to type this I also have problem of circular import? #noqa E501
+    section: t.Optional[Section] = None
     # The detailed result data structure
-    detailed_result: SectionDetailedResultState = None
+    _detailed_result: SectionDetailedResultState = None
 
     @property
     def residual_norm_history(self) -> t.List:
@@ -874,6 +893,13 @@ class StrainProfileResult:
         """Returns the norm of the residual at last iteration."""
         return float(np.linalg.norm(self.residual))
 
+    @property
+    def detailed_result(self) -> SectionDetailedResultState:
+        """Returns the detailed result."""
+        if self._detailed_result is None:
+            self.create_detailed_result()
+        return self._detailed_result
+
     def to_list(self) -> t.List:
         """Returns the strain profile coefficients in a list."""
         return [self.eps_a, self.chi_y, self.chi_z]
@@ -884,8 +910,12 @@ class StrainProfileResult:
         Arguments:
             num_points (int): Number of random points to sample for each
                 surface geometry (default = 1000).
+
+        Notes:
+            It is called with default values when first accessing the property
+                `detailed_result`.
         """
-        self.detailed_result = SectionDetailedResultState(
+        self._detailed_result = SectionDetailedResultState(
             section=self.section,
             eps_a=self.eps_a,
             chi_y=self.chi_y,
@@ -1014,9 +1044,9 @@ class IntegrateStrainForceResult:
     m_z: float = 0.0  # Bending moment Mz
 
     # For context store the section
-    section: t.Any = None  # Note for future: if I want to type this I also have problem of circular import? #noqa E501
+    section: t.Optional[Section] = None
     # The detailed result data structure
-    detailed_result: SectionDetailedResultState = None
+    _detailed_result: SectionDetailedResultState = None
 
     def asarray(self, dtype=np.float64) -> NDArray:
         """Return an array representation of the forces."""
@@ -1026,14 +1056,25 @@ class IntegrateStrainForceResult:
         """Return a tuple representation of the forces."""
         return (self.n, self.m_y, self.m_z)
 
+    @property
+    def detailed_result(self) -> SectionDetailedResultState:
+        """Returns the detailed result."""
+        if self._detailed_result is None:
+            self.create_detailed_result()
+        return self._detailed_result
+
     def create_detailed_result(self, num_points=1000):
         """Create the detailed result object.
 
         Arguments:
             num_points (int): Number of random points to sample for each
                 surface geometry (default = 1000).
+
+        Notes:
+            It is called with default values when first accessing the property
+                `detailed_result`.
         """
-        self.detailed_result = SectionDetailedResultState(
+        self._detailed_result = SectionDetailedResultState(
             section=self.section,
             eps_a=self.eps_a,
             chi_y=self.chi_y,
@@ -1128,8 +1169,8 @@ class IntegrateStrainForceResult:
         )
 
 
-@dataclass
-class InteractionDomain:
+@dataclass(slots=True)
+class InteractionDomainResult:
     """Class for storing common data on all interaction domain results.
 
     Attributes:
@@ -1137,79 +1178,116 @@ class InteractionDomain:
             ky and kz.
         forces (numpy.Array): A numpy array with shape (n, 3) containing n, my
             and mz.
-        field_num (numpy.Array): a numpy array with shape (n,) containing a
-            number between 1 and 6 indicating the failure field.
     """
 
     # array with shape (n,3) containing ea, ky, kz:
-    strains: ArrayLike = None
+    strains: NDArray[np.float64] = None
     # array with shape(n,3) containing N, My, Mz
-    forces: ArrayLike = None
-    # array with shape(n,) containing the field number from 1 to 6
-    field_num: ArrayLike = None
+    forces: NDArray[np.float64] = None
 
     @property
     def n(self):
         """Return axial force."""
-        if self.forces is None:
-            return None
-        return self.forces[:, 0]
+        if self.forces is not None:
+            return self.forces[:, 0]
+        raise ValueError('Forces are not available in this result object.')
 
     @property
     def m_y(self):
         """Return my."""
-        if self.forces is None:
-            return None
-        return self.forces[:, 1]
+        if self.forces is not None:
+            return self.forces[:, 1]
+        raise ValueError('Forces are not available in this result object.')
 
     @property
     def m_z(self):
         """Return mz."""
-        if self.forces is None:
-            return None
-        return self.forces[:, 2]
+        if self.forces is not None:
+            return self.forces[:, 2]
+        raise ValueError('Forces are not available in this result object.')
 
     @property
-    def e_a(self):
-        """Return ea."""
-        if self.strains is None:
-            return None
-        return self.strains[:, 0]
+    def eps_a(self):
+        """Return eps_a (axial strain at 0, 0)."""
+        if self.strains is not None:
+            return self.strains[:, 0]
+        raise ValueError('Strains are not available in this result object.')
 
     @property
-    def k_y(self):
-        """Return ky."""
-        if self.strains is None:
-            return None
-        return self.strains[:, 1]
+    def chi_y(self):
+        """Return chi_y (curvature about y-axis."""
+        if self.strains is not None:
+            self.strains[:, 1]
+        raise ValueError('Strains are not available in this result object.')
 
     @property
-    def k_z(self):
-        """Return kz."""
-        if self.strains is None:
-            return None
-        return self.strains[:, 2]
+    def chi_z(self):
+        """Return chi_z (curvature about z-axis)."""
+        if self.strains is not None:
+            return self.strains[:, 2]
+        raise ValueError('Strains are not available in this result object.')
 
 
-@dataclass
-class NMMInteractionDomain(InteractionDomain):
-    """Class for storing the NMM interaction domain results."""
+@dataclass(slots=True)
+class NMMInteractionDomainResult(InteractionDomainResult):
+    """Class for storing the NMM interaction domain results.
 
-    num_theta: int = 0  # number of discretizations along the angle
-    num_axial: int = 0  # number of discretizations along axial load axis
+    Attributes:
+        num_theta (int): the number of discretizations from 0 to 2pi.
+        field_num (numpy.Array): a numpy array with shape (n,) containing a
+            number between 1 and 6 indicating the failure field.
+    """
+
+    # number of discretizations along the angle
+    num_theta: int = 0
+
+    # number of points from discretization of ultimate strain profiles
+    num_points: int = 0
+
+    # array with shape(n,) containing the field number from 1 to 6
+    field_num: NDArray[np.float64] = None
+
+    # TODO: in the future we could also add methods for returning the results
+    # as a structured mesh for easy plotting. Maybe for increasing values of
+    # N and for increasing values of theta (from 0 to 2pi), so having a nicely
+    # structured grid of points, and maybe also adding the possibility to
+    # the results as a dataframe, with columns for N, theta, field_num, etc.
+    # This would make it easier to analyze the results and to create custom
+    # plots.
 
 
-@dataclass
-class NMInteractionDomain(InteractionDomain):
-    """Class for storing the NM interaction domain results."""
+@dataclass(slots=True)
+class NMInteractionDomainResult(InteractionDomainResult):
+    """Class for storing the NM interaction domain results.
 
-    theta: float = 0  # the inclination of n.a.
-    num_axial: float = 0  # number of discretizations along axial load axis
+    Attributes:
+        theta (float): the inclination of n.a.
+        field_num (numpy.Array): a numpy array with shape (n,) containing a
+            number between 1 and 6 indicating the failure field.
+    """
+
+    # the inclination of n.a.
+    theta: float = 0
+
+    # number of points from discretization of ultimate strain profiles
+    num_points: int = 0
+
+    # array with shape(n,) containing the field number from 1 to 6
+    field_num: NDArray[np.float64] = None
 
 
-@dataclass
-class MMInteractionDomain(InteractionDomain):
-    """Class for storing the MM interaction domain results."""
+@dataclass(slots=True)
+class MMInteractionDomainResult(InteractionDomainResult):
+    """Class for storing the MM interaction domain results.
 
-    num_theta: float = 0  # number of discretizations along the angle
-    theta: ArrayLike = None  # Array with shape (n,) containing the angle of NA
+
+    Attributes:
+        num_theta (int): the number of discretizations from 0 to 2pi.
+        theta (numpy.Array): a numpy array with shape (n,) the angle theta
+    """
+
+    # number of discretizations along the angle
+    num_theta: float = 0
+
+    # Array with shape (n,) containing the angle of NA
+    theta: NDArray[np.float64] = None
