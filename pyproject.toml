@@ -73,3 +73,10 @@ convention = "google"
 docstring-quotes = "double"
 inline-quotes = "single"
 multiline-quotes = "double"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.15.12",
+    "ty>=0.0.32",
+]
