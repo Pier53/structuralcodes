@@ -25,7 +25,7 @@ from ..core.errors import InformationWarning, NoConvergenceWarning
 from .section_integrators import SectionIntegrator, integrator_factory
 
 
-class BeamSection(Section):
+class BeamSection(Section['BeamSectionCalculator']):
     """This is the implementation of the beam section.
 
     The section is a 2D geometry where Y axis is horizontal while Z axis is
@@ -44,6 +44,7 @@ class BeamSection(Section):
     """
 
     geometry: CompoundGeometry
+    section_calculator: BeamSectionCalculator
 
     def __init__(
         self,

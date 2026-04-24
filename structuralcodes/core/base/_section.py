@@ -7,8 +7,12 @@ import typing as t
 
 from ._geometry import Geometry
 
+TSectionCalculator = t.TypeVar(
+    'TSectionCalculator', bound='SectionCalculator'
+)
 
-class Section(abc.ABC):
+
+class Section(abc.ABC, t.Generic[TSectionCalculator]):
     """Abstract base class for a cross secion.
     The section is defined by local axes y and z (mapped to x and y cartesian
     plane respectively).
@@ -16,7 +20,7 @@ class Section(abc.ABC):
 
     geometry: Geometry
     section_counter: t.ClassVar[int] = 0
-    section_calculator: SectionCalculator
+    section_calculator: TSectionCalculator
 
     def __init__(self, name: t.Optional[str] = None) -> None:
         """Initialize a Section object."""
@@ -39,7 +43,7 @@ class SectionCalculator(abc.ABC):
     defining the interface.
     """
 
-    def __init__(self, section: Section) -> None:
+    def __init__(self, section: Section[t.Any]) -> None:
         """Initialization of SectionCalculator object, providing
         a Section object.
         """

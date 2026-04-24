@@ -65,4 +65,4 @@ geometry = add_reinforcement(
 section = BeamSection(geometry)
 
 # Calculate the moment-curvature response
-moment_curvature = section.calculate_moment_curvature_response()
+moment_curvature = section.section_calculator.calculate_moment_curvature()
