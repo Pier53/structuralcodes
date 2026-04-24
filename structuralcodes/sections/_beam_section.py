@@ -94,6 +94,343 @@ class BeamSection(Section):
             )
         return self._gross_properties
 
+    def calculate_limit_axial_load(self) -> t.Tuple[float, float]:
+        """Compute maximum and minimum axial load.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_limit_axial_load`.
+
+        Returns:
+            Tuple(float, float): Minimum and Maximum axial load.
+        """
+        return self.section_calculator.calculate_limit_axial_load()
+
+    def calculate_bending_strength(
+        self,
+        theta: float = 0,
+        n: float = 0,
+        max_iter: int = 100,
+        tol: float = 1e-2,
+    ) -> s_res.UltimateBendingMomentResults:
+        r"""Calculate the bending strength.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_bending_strength`.
+
+        Arguments:
+            theta (float): Inclination of n.a. respect to section y axis in
+                radians, default = 0.
+            n (float): Axial load applied to the section (+: tension, -:
+                compression), default = 0.
+            max_iter (int): the maximum number of iterations in the iterative
+                bisection process (default = 100).
+            tol (float): the tolerance for convergence test (default = 1e-2).
+
+        Returns:
+            UltimateBendingMomentResults: The results from the calculation.
+        """
+        return self.section_calculator.calculate_bending_strength(
+            theta=theta, n=n, max_iter=max_iter, tol=tol
+        )
+
+    @t.overload
+    def integrate_strain_profile(
+        self,
+        strain: ArrayLike,
+        integrate: t.Literal['stress'] = 'stress',
+    ) -> s_res.IntegrateStrainForceResult: ...
+
+    @t.overload
+    def integrate_strain_profile(
+        self,
+        strain: ArrayLike,
+        integrate: t.Literal['modulus'],
+    ) -> s_res.IntegrateStrainStiffnessResult: ...
+
+    def integrate_strain_profile(
+        self,
+        strain: ArrayLike,
+        integrate: t.Literal['stress', 'modulus'] = 'stress',
+    ) -> t.Union[
+        s_res.IntegrateStrainForceResult,
+        s_res.IntegrateStrainStiffnessResult,
+    ]:
+        """Integrate a strain profile returning stress resultants or tangent
+        section stiffness matrix.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.integrate_strain_profile`.
+
+        Arguments:
+            strain (ArrayLike): Represents the deformation plane.
+            integrate (str): 'stress' or 'modulus' (default = 'stress').
+
+        Returns:
+            IntegrateStrainForceResult or IntegrateStrainStiffnessResult.
+        """
+        return self.section_calculator.integrate_strain_profile(
+            strain=strain, integrate=integrate
+        )
+
+    def calculate_moment_curvature(
+        self,
+        theta: float = 0.0,
+        n: float = 0.0,
+        chi_first: float = 1e-8,
+        num_pre_yield: int = 10,
+        num_post_yield: int = 10,
+        chi: t.Optional[ArrayLike] = None,
+        max_iter: int = 100,
+        tol: float = 1e-2,
+    ) -> s_res.MomentCurvatureResults:
+        r"""Calculate the moment-curvature relation.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_moment_curvature`.
+
+        Arguments:
+            theta (float): Inclination of n.a. respect to y axis in radians,
+                default = 0.
+            n (float): Axial load applied to the section (+: tension, -:
+                compression), default = 0.
+            chi_first (float): The first value of the curvature, default =
+                1e-8.
+            num_pre_yield (int): Number of points before yielding,
+                default = 10.
+            num_post_yield (int): Number of points after yielding,
+                default = 10.
+            chi (Optional[ArrayLike]): An ArrayLike with curvatures to use
+                directly. If None, the array is constructed automatically.
+            max_iter (int): the maximum number of iterations (default = 100).
+            tol (float): the tolerance for convergence test (default = 1e-2).
+
+        Returns:
+            MomentCurvatureResults: The calculation results.
+        """
+        return self.section_calculator.calculate_moment_curvature(
+            theta=theta,
+            n=n,
+            chi_first=chi_first,
+            num_pre_yield=num_pre_yield,
+            num_post_yield=num_post_yield,
+            chi=chi,
+            max_iter=max_iter,
+            tol=tol,
+        )
+
+    def calculate_moment_curvature_response(
+        self,
+        theta: float = 0.0,
+        n: float = 0.0,
+        chi_first: float = 1e-8,
+        num_pre_yield: int = 10,
+        num_post_yield: int = 10,
+        chi: t.Optional[ArrayLike] = None,
+        max_iter: int = 100,
+        tol: float = 1e-2,
+    ) -> s_res.MomentCurvatureResults:
+        r"""Calculate the moment-curvature relation.
+
+        Alias for :meth:`BeamSection.calculate_moment_curvature`.
+
+        Arguments:
+            theta (float): Inclination of n.a. respect to y axis in radians,
+                default = 0.
+            n (float): Axial load applied to the section (+: tension, -:
+                compression), default = 0.
+            chi_first (float): The first value of the curvature, default =
+                1e-8.
+            num_pre_yield (int): Number of points before yielding,
+                default = 10.
+            num_post_yield (int): Number of points after yielding,
+                default = 10.
+            chi (Optional[ArrayLike]): An ArrayLike with curvatures to use
+                directly. If None, the array is constructed automatically.
+            max_iter (int): the maximum number of iterations (default = 100).
+            tol (float): the tolerance for convergence test (default = 1e-2).
+
+        Returns:
+            MomentCurvatureResults: The calculation results.
+        """
+        return self.calculate_moment_curvature(
+            theta=theta,
+            n=n,
+            chi_first=chi_first,
+            num_pre_yield=num_pre_yield,
+            num_post_yield=num_post_yield,
+            chi=chi,
+            max_iter=max_iter,
+            tol=tol,
+        )
+
+    def calculate_nm_interaction_domain(
+        self,
+        theta: float = 0,
+        num_1: int = 1,
+        num_2: int = 2,
+        num_3: int = 15,
+        num_4: int = 10,
+        num_5: int = 3,
+        num_6: int = 4,
+        num: t.Optional[int] = None,
+        type_1: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_2: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_3: t.Literal['linear', 'geometric', 'quadratic'] = 'geometric',
+        type_4: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_5: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_6: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        complete_domain: bool = False,
+    ) -> s_res.NMInteractionDomainResult:
+        """Calculate the NM interaction domain.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_nm_interaction_domain`.
+
+        Arguments:
+            theta (float): Inclination of n.a. respect to y axis in radians
+                (Optional, default = 0).
+            num_1 (int): Number of strain profiles in field 1
+                (Optional, default = 1).
+            num_2 (int): Number of strain profiles in field 2
+                (Optional, default = 2).
+            num_3 (int): Number of strain profiles in field 3
+                (Optional, default = 15).
+            num_4 (int): Number of strain profiles in field 4
+                (Optional, default = 10).
+            num_5 (int): Number of strain profiles in field 5
+                (Optional, default = 3).
+            num_6 (int): Number of strain profiles in field 6
+                (Optional, default = 4).
+            num (int): Total number of strain profiles (Optional).
+            type_1 through type_6 (str): Type of spacing for each field.
+            complete_domain (bool): Include the positive moment part
+                (default = False).
+
+        Returns:
+            NMInteractionDomainResult: The calculation results.
+        """
+        return self.section_calculator.calculate_nm_interaction_domain(
+            theta=theta,
+            num_1=num_1,
+            num_2=num_2,
+            num_3=num_3,
+            num_4=num_4,
+            num_5=num_5,
+            num_6=num_6,
+            num=num,
+            type_1=type_1,
+            type_2=type_2,
+            type_3=type_3,
+            type_4=type_4,
+            type_5=type_5,
+            type_6=type_6,
+            complete_domain=complete_domain,
+        )
+
+    def calculate_nmm_interaction_domain(
+        self,
+        num_theta: int = 33,
+        num_1: int = 1,
+        num_2: int = 2,
+        num_3: int = 15,
+        num_4: int = 10,
+        num_5: int = 3,
+        num_6: int = 4,
+        num: t.Optional[int] = None,
+        type_1: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_2: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_3: t.Literal['linear', 'geometric', 'quadratic'] = 'geometric',
+        type_4: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_5: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+        type_6: t.Literal['linear', 'geometric', 'quadratic'] = 'linear',
+    ) -> s_res.NMMInteractionDomainResult:
+        """Calculate the NMM interaction domain.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_nmm_interaction_domain`.
+
+        Arguments:
+            num_theta (int): Number of discretization of angle of neutral axis
+                (Optional, Default = 33).
+            num_1 through num_6 (int): Number of strain profiles in each field.
+            num (int): Total number of strain profiles (Optional).
+            type_1 through type_6 (str): Type of spacing for each field.
+
+        Returns:
+            NMMInteractionDomainResult: The calculation results.
+        """
+        return self.section_calculator.calculate_nmm_interaction_domain(
+            num_theta=num_theta,
+            num_1=num_1,
+            num_2=num_2,
+            num_3=num_3,
+            num_4=num_4,
+            num_5=num_5,
+            num_6=num_6,
+            num=num,
+            type_1=type_1,
+            type_2=type_2,
+            type_3=type_3,
+            type_4=type_4,
+            type_5=type_5,
+            type_6=type_6,
+        )
+
+    def calculate_mm_interaction_domain(
+        self,
+        n: float = 0,
+        num_theta: int = 33,
+        max_iter: int = 100,
+        tol: float = 1e-2,
+    ) -> s_res.MMInteractionDomainResult:
+        r"""Calculate the My-Mz interaction domain.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_mm_interaction_domain`.
+
+        Arguments:
+            n (float): Axial force, default = 0.
+            num_theta (int): Number of discretization for theta, default = 33.
+            max_iter (int): the maximum number of iterations (default = 100).
+            tol (float): the tolerance for convergence test (default = 1e-2).
+
+        Returns:
+            MMInteractionDomainResult: The calculation results.
+        """
+        return self.section_calculator.calculate_mm_interaction_domain(
+            n=n, num_theta=num_theta, max_iter=max_iter, tol=tol
+        )
+
+    def calculate_strain_profile(
+        self,
+        n: float,
+        my: float,
+        mz: float,
+        initial: bool = False,
+        max_iter: int = 10,
+        tol: float = 1e-6,
+    ) -> s_res.StrainProfileResult:
+        """Get the strain plane for a given axial force and biaxial bending.
+
+        Delegates to
+        :meth:`BeamSectionCalculator.calculate_strain_profile`.
+
+        Args:
+            n (float): Axial load.
+            my (float): Bending moment around y-axis.
+            mz (float): Bending moment around z-axis.
+            initial (bool): If True the modified newton with initial tangent is
+                used (default = False).
+            max_iter (int): the maximum number of iterations (default = 10).
+            tol (float): the tolerance for convergence test (default = 1e-6).
+
+        Returns:
+            StrainProfileResult: The results.
+        """
+        return self.section_calculator.calculate_strain_profile(
+            n=n, my=my, mz=mz, initial=initial, max_iter=max_iter, tol=tol
+        )
+
 
 class BeamSectionCalculator(SectionCalculator):
     """Calculator class implementing analysis algorithms for code checks."""
