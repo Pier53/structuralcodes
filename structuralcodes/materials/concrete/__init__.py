@@ -17,7 +17,7 @@ __all__ = [
     'ConcreteEC2_2004',
 ]
 
-CONCRETES: t.Dict[str, Concrete] = {
+CONCRETES: t.Dict[str, t.Type[Concrete]] = {
     'fib Model Code 2010': ConcreteMC2010,
     'EUROCODE 2 1992-1-1:2004': ConcreteEC2_2004,
     'EUROCODE 2 1992-1-1:2023': ConcreteEC2_2023,
@@ -32,7 +32,7 @@ def create_concrete(
     existing: bool = False,
     design_code: t.Optional[str] = None,
     **kwargs,
-) -> t.Optional[Concrete]:
+) -> Concrete:
     """A factory function to create the correct type of concrete based on the
     desired design code.
 
@@ -72,14 +72,17 @@ def create_concrete(
         )
 
     # Create the proper concrete object
-    current_concrete = CONCRETES.get(code.__title__, None)
-    if current_concrete is not None:
-        return current_concrete(
-            fck=fck,
-            name=name,
-            density=density,
-            gamma_c=gamma_c,
-            existing=existing,
-            **kwargs,
+    current_concrete = CONCRETES.get(code.__title__)
+    if current_concrete is None:
+        raise ValueError(
+            f'The selected design code "{code.__title__}" does not provide '
+            'a concrete implementation in the factory mapping.'
         )
-    return None
+    return current_concrete(
+        fck=fck,
+        name=name,
+        density=density,
+        gamma_c=gamma_c,
+        existing=existing,
+        **kwargs,
+    )

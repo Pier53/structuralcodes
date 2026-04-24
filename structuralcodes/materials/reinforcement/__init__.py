@@ -17,7 +17,7 @@ __all__ = [
     'ReinforcementEC2_2023',
 ]
 
-REINFORCEMENTS: t.Dict[str, Reinforcement] = {
+REINFORCEMENTS: t.Dict[str, t.Type[Reinforcement]] = {
     'fib Model Code 2010': ReinforcementMC2010,
     'EUROCODE 2 1992-1-1:2004': ReinforcementEC2_2004,
     'EUROCODE 2 1992-1-1:2023': ReinforcementEC2_2023,
@@ -34,7 +34,7 @@ def create_reinforcement(
     density: float = 7850,
     design_code: t.Optional[str] = None,
     **kwargs,
-) -> t.Optional[Reinforcement]:
+) -> Reinforcement:
     """A factory function to create the correct type of reinforcement based on
     the desired design code.
 
@@ -75,16 +75,19 @@ def create_reinforcement(
         )
 
     # Create the proper reinforcement object
-    current_reinforcement = REINFORCEMENTS.get(code.__title__, None)
-    if current_reinforcement is not None:
-        return current_reinforcement(
-            fyk=fyk,
-            Es=Es,
-            name=name,
-            density=density,
-            ftk=ftk,
-            epsuk=epsuk,
-            gamma_s=gamma_s,
-            **kwargs,
+    current_reinforcement = REINFORCEMENTS.get(code.__title__)
+    if current_reinforcement is None:
+        raise ValueError(
+            f'The selected design code "{code.__title__}" does not provide '
+            'a reinforcement implementation in the factory mapping.'
         )
-    return None
+    return current_reinforcement(
+        fyk=fyk,
+        Es=Es,
+        name=name,
+        density=density,
+        ftk=ftk,
+        epsuk=epsuk,
+        gamma_s=gamma_s,
+        **kwargs,
+    )
