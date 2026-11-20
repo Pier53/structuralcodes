@@ -8,8 +8,7 @@ class StructuralCodesWarning(Warning):
 class NoConvergenceWarning(StructuralCodesWarning):
     """Warning for lack of convergence.
 
-    A warning that indicates that no convergence was reached for an
-    iterative solver. The solution should be inspected with care.
+    A warning tht The solution should be inspected with care.
     """
 
 
