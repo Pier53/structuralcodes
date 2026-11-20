@@ -15,6 +15,5 @@ class NoConvergenceWarning(StructuralCodesWarning):
 class InformationWarning(StructuralCodesWarning):
     """Warning for simple information.
     xxx
-    A warning that indicates that some information that should be taken care
-    by user, but the calculation is not invalid.
+    A warning that indicatekj is not invalid.
     """
