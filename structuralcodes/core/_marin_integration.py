@@ -21,10 +21,7 @@ def marin_integration(
     """Marin's algorithm for integrating a polynomial over a closed polygon.
 
     The order of the polygon vertices is significant. If the points are in
-    counterclockwise order the integral is positive, otherwise the integral is
-    negative.
-
-    Arguments:
+    counterclockwisqsfs
         y (List(float)): Y coordinates of polygon vertices.
         z (List(float)): Z coordinates of polygon vertices.
         m (int): The degree of the polynomial in the y direction.
